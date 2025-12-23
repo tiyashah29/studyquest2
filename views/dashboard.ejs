@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <link rel="stylesheet" href="/css/style.css">
+    <title>Dashboard | StudyQuest</title>
+</head>
+
+<body>
+
+    <div style="display: flex; min-height: 100vh;">
+        <nav style="width: 280px; padding: 2rem; border-right: 1px solid var(--border);">
+            <h2 style="color: var(--primary); margin-bottom: 3rem;">⚔️ StudyQuest</h2>
+            <div style="display: flex; flex-direction: column; gap: 1rem;">
+                <a href="/dashboard" class="nav-link active">🏠 Dashboard</a>
+                <a href="/quiz-select" class="nav-link">📝 Take a Quiz</a>
+                <a href="/logout" class="nav-link" style="margin-top: auto;">Logout</a>
+            </div>
+        </nav>
+
+        <main style="flex: 1; padding: 3rem;">
+            <header style="display: flex; justify-content: space-between; margin-bottom: 3rem;">
+                <div>
+                    <h1>Welcome back, <%= user.username %>!</h1>
+                    <p style="color: var(--text-muted);">Current Rank: #<span id="my-rank">--</span></p>
+                </div>
+                <div class="glass-card" style="padding: 1rem 2rem; text-align: center;">
+                    <p style="color: var(--accent); font-weight: bold; font-size: 1.5rem;">
+                        <%= user.xp %> XP
+                    </p>
+                    <p style="font-size: 0.8rem; color: var(--text-muted);">LEVEL <%= user.level %>
+                    </p>
+                </div>
+            </header>
+
+            <section class="glass-card">
+                <h3 style="margin-bottom: 1.5rem;">🏆 Global Rankings</h3>
+                <table class="leaderboard-table">
+                    <thead>
+                        <tr>
+                            <th>Rank</th>
+                            <th>User</th>
+                            <th>Level</th>
+                            <th>XP Score</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-data">
+                    </tbody>
+                </table>
+            </section>
+        </main>
+    </div>
+    <script>
+        // This script fetches all users and populates the table
+        async function loadLeaderboard() {
+            const res = await fetch('/api/leaderboard');
+            const users = await res.json();
+            const tbody = document.getElementById('leaderboard-data');
+            const currentUsername = "<%= user.username %>";
+
+            tbody.innerHTML = users.map((u, index) => {
+                const isMe = u.username === currentUsername;
+                if (isMe) document.getElementById('my-rank').innerText = index + 1;
+
+                return `
+                    <tr style="${isMe ? 'background: rgba(99, 102, 241, 0.1);' : ''}">
+                        <td>#${index + 1}</td>
+                        <td style="font-weight: ${isMe ? 'bold' : 'normal'}">${u.username} ${isMe ? '(You)' : ''}</td>
+                        <td>Lv. ${u.level}</td>
+                        <td style="color: var(--accent); font-weight: bold;">${u.xp}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        window.onload = loadLeaderboard;
+    </script>
+</body>
+
+</html>

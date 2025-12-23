@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="/css/style.css">
+    <title>Quest Arena | StudyQuest</title>
+</head>
+
+<body style="background: radial-gradient(circle at top right, #1e1b4b, #0f172a); color: #f8fafc; min-height: 100vh;">
+
+    <main style="display: flex; flex-direction: column; align-items: center; padding: 2rem;">
+
+        <div class="glass-card" style="margin-bottom: 2rem; padding: 10px 20px; border-radius: 50px;">
+            🛡️ <span style="color: #94a3b8;">Monitoring Active | Warnings:</span>
+            <span id="warning-count" style="color: #ef4444; font-weight: bold;">0/3</span>
+        </div>
+
+        <div
+            style="width: 100%; max-width: 600px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+            <div id="progress-text" style="color: #94a3b8; font-weight: 500;">Question 1 of 10</div>
+
+            <div id="timer-ring"
+                style="width: 60px; height: 60px; border-radius: 50%; background: conic-gradient(#6366f1 100%, #334155 0%); display: flex; align-items: center; justify-content: center;">
+                <div style="width: 50px; height: 50px; background: #0f172a; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;"
+                    id="timer-text">30</div>
+            </div>
+
+            <div id="score-text" style="color: #10b981; font-weight: bold;">XP: 0</div>
+        </div>
+
+        <div class="glass-card"
+            style="width: 100%; max-width: 600px; min-height: 400px; display: flex; flex-direction: column;">
+            <h2 id="q-text" style="margin-bottom: 2rem; line-height: 1.4;">Loading Quest...</h2>
+
+            <div id="options-list" style="display: grid; grid-template-columns: 1fr; gap: 1rem; margin-top: auto;">
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { antiCheat } from '/js/antiCheat.js';
+
+        let questions = [];
+        let currentIdx = 0;
+        let score = 0;
+        let timer;
+        let timeLeft = 30;
+
+        async function init() {
+            try {
+                const res = await fetch(`/api/quiz-questions/<%= quizId %>`);
+                questions = await res.json();
+
+                if (questions.length === 0) {
+                    document.getElementById('q-text').innerText = "No questions found for this quiz.";
+                    return;
+                }
+
+                // Start anti-cheat monitoring
+                antiCheat.start();
+
+                // Keep HUD updated with warning count
+                setInterval(() => {
+                    document.getElementById('warning-count').innerText = `${antiCheat.warnings}/3`;
+                }, 1000);
+
+                render();
+            } catch (err) {
+                console.error("Failed to load quiz:", err);
+            }
+        }
+
+        function startTimer() {
+            // FIX: Always clear the previous interval before starting a new one
+            clearInterval(timer);
+            timeLeft = 30;
+
+            updateTimerUI();
+
+            timer = setInterval(() => {
+                timeLeft--;
+                updateTimerUI();
+
+                if (timeLeft <= 0) {
+                    clearInterval(timer);
+                    currentIdx++;
+                    render(); // Move to next question automatically on timeout
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            document.getElementById('timer-text').innerText = timeLeft;
+            const percent = (timeLeft / 30) * 100;
+            document.getElementById('timer-ring').style.background =
+                `conic-gradient(#6366f1 ${percent}%, #334155 0%)`;
+        }
+
+        function render() {
+            // FIX: Check against actual array length to avoid "stuck at 3"
+            if (currentIdx >= questions.length || currentIdx >= 10) {
+                return finish();
+            }
+
+            const q = questions[currentIdx];
+            document.getElementById('q-text').innerText = q.question_text;
+            document.getElementById('progress-text').innerText = `Question ${currentIdx + 1} of ${questions.length}`;
+
+            const list = document.getElementById('options-list');
+            list.innerHTML = '';
+
+            const options = [q.option_a, q.option_b, q.option_c, q.option_d];
+            options.forEach((text, i) => {
+                const btn = document.createElement('button');
+                btn.className = 'btn-premium';
+                btn.style = "text-align: left; padding: 15px;";
+                btn.innerText = text;
+                btn.onclick = () => {
+                    if (i === q.correct_option) {
+                        score += 100;
+                        document.getElementById('score-text').innerText = `XP: ${score}`;
+                    }
+                    currentIdx++;
+                    render();
+                };
+                list.appendChild(btn);
+            });
+
+            startTimer(); // Reset timer for the new question
+        }
+
+        async function finish() {
+            clearInterval(timer);
+            antiCheat.stop(); // Stop monitoring
+
+            await fetch('/api/update-xp', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ xpGained: score })
+            });
+
+            alert(`Quest Complete! You earned ${score} XP.`);
+            window.location.href = '/dashboard';
+        }
+
+        window.onload = init;
+    </script>
+</body>
+
+</html>
